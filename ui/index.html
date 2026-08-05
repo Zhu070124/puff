@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Puff — 创意总监</title>
+<style>
+:root {
+  --bg: #faf6f0;
+  --surface: #f5f0e8;
+  --text: #3a3530;
+  --muted: #8a8078;
+  --accent: #5b7e9a;
+  --accent-warm: #c4a574;
+  --bubble-user: #e8e0d5;
+  --bubble-puff: #dce8f0;
+  --border: #e0d8cc;
+  --paper: #f8f4ed;
+}
+.dark {
+  --bg: #1a1d24;
+  --surface: #22262e;
+  --text: #c8c4c0;
+  --muted: #6a6460;
+  --accent: #7a9eb8;
+  --accent-warm: #d4b88c;
+  --bubble-user: #2a2e36;
+  --bubble-puff: #1e2834;
+  --border: #2e3238;
+  --paper: #1e2128;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height:100vh; display:flex; flex-direction:column;
+  transition: background .3s, color .3s;
+}
+header {
+  background: var(--surface);
+  border-bottom:1px solid var(--border);
+  padding:14px 20px;
+  display:flex; align-items:center; gap:14px;
+  flex-shrink:0;
+}
+.avatar {
+  width:44px; height:44px; border-radius:50%;
+  background: linear-gradient(135deg, #7a9eb8 0%, #4a6a8a 50%, #3a5a7a 100%);
+  display:flex; align-items:center; justify-content:center;
+  font-size:22px; color:#e0e8f0;
+  flex-shrink:0;
+  border: 2px solid var(--accent);
+}
+.whale-pin {
+  position:absolute; margin-left:18px; margin-top:-18px;
+  font-size:12px; color: #2a4a6a;
+  background: var(--surface); border-radius: 50%;
+  width:20px; height:20px; display:flex; align-items:center; justify-content:center;
+}
+.header-info { flex:1; }
+.header-info h1 { font-size:17px; font-weight:500; color: var(--text); }
+.header-info span { font-size:12px; color: var(--muted); }
+.actions { display:flex; gap:8px; }
+.actions button {
+  background:none; border:1px solid var(--border);
+  color:var(--muted); padding:6px 12px; border-radius:6px;
+  cursor:pointer; font-size:12px; transition:.2s;
+}
+.actions button:hover { color:var(--text); border-color:var(--accent); }
+main { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:14px; }
+.message { display:flex; gap:10px; max-width:80%; animation: fadeIn .3s ease; }
+.message.user { align-self:flex-end; flex-direction:row-reverse; }
+.message.puff { align-self:flex-start; }
+.bubble {
+  padding:12px 16px; border-radius:16px;
+  font-size:15px; line-height:1.6;
+  word-break:break-word;
+}
+.user .bubble { background:var(--bubble-user); border-bottom-right-radius:4px; }
+.puff .bubble { background:var(--bubble-puff); border-bottom-left-radius:4px; }
+.msg-avatar {
+  width:32px; height:32px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px;
+}
+.user .msg-avatar { background:var(--accent-warm); color:#fff; }
+.puff .msg-avatar { background:var(--accent); color:#e0e8f0; }
+footer {
+  background:var(--surface);
+  border-top:1px solid var(--border);
+  padding:14px 20px; flex-shrink:0;
+}
+.input-row { display:flex; gap:10px; }
+textarea {
+  flex:1; background:var(--paper); border:1px solid var(--border);
+  color:var(--text); padding:12px 16px; border-radius:12px;
+  font-size:15px; font-family:inherit; resize:none;
+  min-height:44px; max-height:120px; outline:none;
+  transition: border-color .2s;
+}
+textarea:focus { border-color:var(--accent); }
+.send-btn {
+  background: var(--accent); color:#fff; border:none;
+  padding:12px 20px; border-radius:12px; cursor:pointer;
+  font-size:15px; transition:.2s; white-space:nowrap;
+}
+.send-btn:hover { opacity:0.85; }
+.slash-hint {
+  font-size:11px; color:var(--muted); margin-top:6px;
+  display:flex; gap:14px; flex-wrap:wrap;
+}
+.slash-hint span { cursor:pointer; transition:.2s; }
+.slash-hint span:hover { color:var(--accent); }
+.loading .bubble { opacity:0.6; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="position:relative">
+    <div class="avatar">P</div>
+    <div class="whale-pin">🐋</div>
+  </div>
+  <div class="header-info">
+    <h1>Puff</h1>
+    <span>创意总监 · butter yuan · 随时倾听</span>
+  </div>
+  <div class="actions">
+    <button onclick="toggleTheme()" title="日/夜模式">🌓</button>
+    <button onclick="resetChat()">新的会话</button>
+  </div>
+</header>
+
+<main id="chat">
+  <div class="message puff">
+    <div class="msg-avatar" style="background:var(--accent);color:#e0e8f0;">P</div>
+    <div class="bubble">泡芙，我在。</div>
+  </div>
+</main>
+
+<footer>
+  <div class="input-row">
+    <textarea id="input" placeholder="想说点什么..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();send()}"></textarea>
+    <button class="send-btn" onclick="send()">发送</button>
+  </div>
+  <div class="slash-hint">
+    <span onclick="quickCmd('search ')">/search 搜索记忆</span>
+    <span onclick="quickCmd('remember ')">/remember 记录</span>
+    <span onclick="quickCmd('recall')">/recall 记忆状态</span>
+    <span onclick="quickCmd('search 泡芙')">泡芙是谁</span>
+  </div>
+</footer>
+
+<script>
+const chatEl = document.getElementById('chat');
+const input = document.getElementById('input');
+let isDark = false;
+
+function toggleTheme() {
+  isDark = !isDark;
+  document.body.classList.toggle('dark', isDark);
+}
+
+function addMessage(role, text) {
+  const div = document.createElement('div');
+  div.className = 'message ' + role;
+  const avatar = role === 'user' ? '泡' : 'P';
+  div.innerHTML = `
+    <div class="msg-avatar">${avatar}</div>
+    <div class="bubble">${escapeHtml(text)}</div>
+  `;
+  chatEl.appendChild(div);
+  chatEl.scrollTop = chatEl.scrollHeight;
+  return div;
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+async function send() {
+  const msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  addMessage('user', msg);
+
+  // Loading indicator
+  const loading = addMessage('puff', '...');
+  loading.classList.add('loading');
+
+  try {
+    if (msg.startsWith('/')) {
+      const parts = msg.slice(1).split(/\s+(.*)/s);
+      const cmd = parts[0];
+      const args = parts[1] || '';
+      if (cmd === 'remember' || cmd === 'search' || cmd === 'recall') {
+        const resp = await fetch('/api/command', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({command: msg.slice(1)})
+        });
+        const data = await resp.json();
+        loading.remove();
+        addMessage('puff', data.response);
+        return;
+      }
+    }
+
+    const resp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg})
+    });
+    const data = await resp.json();
+    loading.remove();
+    addMessage('puff', data.response);
+  } catch(e) {
+    loading.remove();
+    addMessage('puff', '连接中断... 服务器在运行吗？');
+  }
+}
+
+function quickCmd(cmd) {
+  input.value = '/' + cmd;
+  input.focus();
+}
+
+async function resetChat() {
+  await fetch('/api/reset', {method:'POST'});
+  chatEl.innerHTML = '';
+  addMessage('puff', '泡芙，我在。');
+}
+
+input.focus();
+</script>
+</body>
+</html>
