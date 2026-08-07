@@ -1,18 +1,22 @@
 """
 Puff Security Module — path sandbox, rate limiter, logging, SOUL hot reload.
 """
-import os, sys, time, logging
+import os, sys, time, logging, threading
 from pathlib import Path
 
 # ── Logging setup ───────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.FileHandler(Path(__file__).parent / "puff.log", encoding="utf-8"),
-        logging.StreamHandler(sys.stderr),
-    ]
-)
+try:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[
+            logging.FileHandler(Path(__file__).parent / "puff.log", encoding="utf-8"),
+            logging.StreamHandler(sys.stderr),
+        ]
+    )
+except Exception:
+    # CI/test environments may not have write access
+    logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 log = logging.getLogger("puff.security")
 
 # ── Path Sandbox ───────────────────────────────────────────────────────────
@@ -71,7 +75,7 @@ class RateLimiter:
         self.max = max_calls
         self.window = window
         self.calls = []
-        self._lock = __import__('threading').Lock()
+        self._lock = threading.Lock()
 
     def ok(self) -> bool:
         with self._lock:
