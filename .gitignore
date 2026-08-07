@@ -1,0 +1,16 @@
+__pycache__/
+
+.env
+
+*.pyc
+
+*.pyo
+
+# Log files
+*.log
+
+# Session data (contains conversation history)
+ui/session.json
+
+# Docker
+data/

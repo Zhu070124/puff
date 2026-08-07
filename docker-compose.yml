@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  puff:
+    build: .
+    container_name: puff-agent
+    ports:
+      - "8920:8920"
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      - PUFF_MODEL=${PUFF_MODEL:-deepseek-v4-flash}
+      - MEMORY_HUB_URL=${MEMORY_HUB_URL:-http://127.0.0.1:8921}
+      - PUFF_WORK_ROOT=/app
+    volumes:
+      # Mount SOUL.md and memory for personality + persistence
+      - ../agents/creative-director/SOUL.md:/app/agents/creative-director/SOUL.md:ro
+      - ./data/memory:/app/agents/creative-director
+      - ./data/session.json:/app/ui/session.json
+    restart: unless-stopped
+    networks:
+      - puff-net
+
+  # Optional: Memory Hub for cross-agent profile sharing
+  # Uncomment if you have memory-hub set up:
+  # memory-hub:
+  #   build: ../memory-hub
+  #   container_name: puff-memory-hub
+  #   ports:
+  #     - "8921:8921"
+  #   networks:
+  #     - puff-net
+
+networks:
+  puff-net:
+    driver: bridge
