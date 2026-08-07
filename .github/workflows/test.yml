@@ -9,4 +9,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install pytest
-      - run: PYTHONPATH=. python -m pytest tests/ -v --tb=short
+      - run: |
+          cd $GITHUB_WORKSPACE
+          export PYTHONPATH=$GITHUB_WORKSPACE
+          python -m pytest tests/ -v --tb=long 2>&1
