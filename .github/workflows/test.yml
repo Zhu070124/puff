@@ -10,4 +10,3 @@ jobs:
           python-version: '3.11'
       - run: pip install pytest
       - run: PYTHONPATH=. python -m pytest tests/ -v --tb=short
-# CI trigger
