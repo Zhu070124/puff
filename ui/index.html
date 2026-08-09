@@ -273,6 +273,7 @@ textarea:focus {
     <span onclick="quickCmd('remember ')">/remember 记录</span>
     <span onclick="quickCmd('read ')">/read 读文件</span>
     <span onclick="quickCmd('ls ')">/ls 看目录</span>
+    <span onclick="quickCmd('shadow')">/shadow 攒素材</span>
   </div>
 </footer>
 
@@ -395,7 +396,7 @@ async function send() {
     if (msg.startsWith('/')) {
       const parts = msg.slice(1).split(/\s+(.*)/s);
       const cmd = parts[0];
-      if (cmd === 'remember' || cmd === 'search' || cmd === 'recall' || cmd === 'read' || cmd === 'write' || cmd === 'ls') {
+      if (cmd === 'remember' || cmd === 'search' || cmd === 'recall' || cmd === 'read' || cmd === 'write' || cmd === 'ls' || cmd === 'shadow' || cmd === 'writing-shadow') {
         const data = await apiCall('/api/command', {command: msg.slice(1)});
         loading.remove();
         const resp = data.response || '（Puff 收到了，但没能组织出回复。可能是网络波动，再试一次？）';

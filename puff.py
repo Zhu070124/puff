@@ -705,8 +705,134 @@ def handle_slash_command(cmd, args, system_prompt, history):
         history.clear()
         return "即时记忆已清除。", False, system_prompt
 
+    elif cmd == "shadow" or cmd == "writing-shadow":
+        result = _run_shadow()
+        return result, False, system_prompt
+
     else:
         return f"未知命令: /{cmd}。输入 /help 查看可用命令。", False, system_prompt
+
+
+# ── Writing Shadow ───────────────────────────────────────────────────────────
+def _run_shadow():
+    """从 Puff 对话/记忆/知识库中提取精华句子，归档到 writing-vault.md"""
+    import re
+    import hashlib as _hl
+
+    MIN_LEN = 80
+    HIT_PATTERNS = [
+        re.compile(r"但[是]?.{10,}"),
+        re.compile(r"[不没].{0,5}[是叫].{10,}"),
+        re.compile(r"你.{2,10}[的是].{10,}"),
+        re.compile(r"不[是在于要].{10,}"),
+        re.compile(r"因为|所以|如果|而是"),
+    ]
+    SKIP_PATTERNS = [
+        re.compile(r"^哈哈+|^好的|^收到|^OK|^行[啊吧]?$"),
+        re.compile(r"^可以[的哦]?$|^没问题$|^了解了$"),
+        re.compile(r"我在这里|我在这儿|我在呢"),
+        re.compile(r"泡芙，我在"),
+    ]
+
+    def is_highlight(text):
+        text = text.strip()
+        if len(text) < MIN_LEN:
+            return False
+        for p in SKIP_PATTERNS:
+            if p.match(text):
+                return False
+        for p in HIT_PATTERNS:
+            if p.search(text):
+                return True
+        return False
+
+    def fp(text):
+        return _hl.md5(text.strip().encode()).hexdigest()[:16]
+
+    vault = CLAWD_DIR / "writing-vault.md"
+    seen = set()
+    if vault.exists():
+        for line in vault.read_text(encoding="utf-8").split("\n"):
+            m = re.match(r'^> "(.+)"$', line.strip())
+            if m:
+                seen.add(fp(m.group(1)))
+
+    items = []
+
+    # 1. Puff session
+    sess = PUFF_DIR / "ui" / "session.json"
+    if sess.exists():
+        try:
+            data = json.loads(sess.read_text(encoding="utf-8"))
+            for msg in data.get("history", []):
+                role = msg.get("role", "")
+                content = msg.get("content", "")
+                t = msg.get("time", "")
+                if role in ("user", "assistant") and is_highlight(content):
+                    label = "泡芙" if role == "user" else "Puff"
+                    items.append((content, f"{label} 对话", t))
+        except Exception:
+            pass
+
+    # 2. Private memory
+    mem = AGENT_DIR / "memory.md"
+    if mem.exists():
+        try:
+            for para in mem.read_text(encoding="utf-8").split("\n\n"):
+                p = para.strip()
+                if is_highlight(p):
+                    items.append((p, "私有记忆", ""))
+        except Exception:
+            pass
+
+    # 3. Memory Hub
+    hub_dir = CLAWD_DIR / "memory-hub" / "data"
+    if hub_dir.exists():
+        try:
+            for f in sorted(hub_dir.glob("*.json")):
+                try:
+                    d = json.loads(f.read_text(encoding="utf-8"))
+                    for ins in (d if isinstance(d, list) else [d]):
+                        c = ins.get("content", "")
+                        if is_highlight(c):
+                            items.append((c, f"Memory Hub · {ins.get('lens', 'general')}", ins.get("created_at", "")))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    # Dedup
+    new = []
+    for text, source, t in items:
+        f = fp(text)
+        if f not in seen:
+            new.append((f, text, source, t))
+            seen.add(f)
+
+    if not new:
+        return "✍️ 没有新的精华可采。要么最近聊得太水，要么都存过了。"
+
+    # Write
+    today = datetime.now().strftime("%Y-%m-%d")
+    with open(vault, "a", encoding="utf-8") as f:
+        if vault.stat().st_size == 0:
+            f.write("# ✍️ 写作宝库\n\n> 从 Puff 对话中采集的写作素材。自动归档，按日期排列。\n\n---\n\n")
+        f.write(f"\n## {today}\n\n")
+        for _, text, source, t in new:
+            quote = f'> "{text}"'
+            src = f"  — {source}"
+            if t:
+                try:
+                    ts = datetime.fromisoformat(t).strftime("%H:%M")
+                    src += f"，{ts}"
+                except Exception:
+                    pass
+            f.write(f"{quote}\n{src}\n\n")
+
+    log.info(f"Writing shadow: {len(new)} highlights saved")
+    return f"✍️ 采集完成！{len(new)} 条新素材已归档到 writing-vault.md\n\n" + "\n\n".join(
+        f'> "{text[:120]}{"..." if len(text) > 120 else ""}"\n  — {source}' for _, text, source, _ in new[:5]
+    ) + ("\n\n…更多见 vault" if len(new) > 5 else "")
 
 
 # ── Main loop ───────────────────────────────────────────────────────────────
@@ -953,6 +1079,8 @@ def serve_http(port=8920):
                 elif cmd.startswith("ls"):
                     path_str = cmd[3:].strip() or "."
                     resp = f"[目录] {path_str}\n{list_dir(path_str)}"
+                elif cmd == "shadow" or cmd == "writing-shadow":
+                    resp = _run_shadow()
                 else:
                     resp = f"未知命令: {cmd}"
 
