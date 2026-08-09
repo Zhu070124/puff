@@ -766,8 +766,9 @@ def main():
         print()
 
         # Update history
-        history.append({"role": "user", "content": user_input})
-        history.append({"role": "assistant", "content": response})
+        now = datetime.now().isoformat()
+        history.append({"role": "user", "content": user_input, "time": now})
+        history.append({"role": "assistant", "content": response, "time": now})
 
 
 # ── HTTP Server mode ────────────────────────────────────────────────────────
@@ -889,13 +890,14 @@ def serve_http(port=8920):
                     return self._send_json({"error": f"对话失败: {e}"}, 500)
 
                 with state_lock:
-                    state["history"].append({"role": "user", "content": message})
-                    state["history"].append({"role": "assistant", "content": response})
+                    now = datetime.now().isoformat()
+                    state["history"].append({"role": "user", "content": message, "time": now})
+                    state["history"].append({"role": "assistant", "content": response, "time": now})
                     if len(state["history"]) > 40:
                         state["history"] = state["history"][-20:]
                     save_session(state["history"])
 
-                self._send_json({"response": response})
+                self._send_json({"response": response, "time": now})
 
             elif self.path == "/api/command":
                 body = self._read_body()
@@ -939,14 +941,14 @@ def serve_http(port=8920):
                 else:
                     resp = f"未知命令: {cmd}"
 
-                self._send_json({"response": resp})
+                self._send_json({"response": resp, "time": datetime.now().isoformat()})
 
             elif self.path == "/api/reset":
                 with state_lock:
                     state["history"] = []
                     state["system_prompt"] = build_system_prompt()
                     save_session(state["history"])
-                self._send_json({"response": "会话已重置"})
+                self._send_json({"response": "会话已重置", "time": datetime.now().isoformat()})
 
             elif self.path == "/api/history":
                 with state_lock:

@@ -144,6 +144,10 @@ main::after {
 }
 .user .bubble { background:var(--bubble-user); border-bottom-right-radius:6px; }
 .puff .bubble { background:var(--bubble-puff); border-bottom-left-radius:6px; }
+.msg-time {
+  font-size:10px; color:var(--muted); margin-top:4px;
+  opacity:0.6; user-select:none;
+}
 
 .msg-avatar {
   width:34px; height:34px; border-radius:50%; flex-shrink:0;
@@ -328,7 +332,17 @@ function toggleTheme() {
   document.body.classList.toggle('dark', isDark);
 }
 
-function addMessage(role, text) {
+function fmtTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  const time = pad(d.getHours()) + ':' + pad(d.getMinutes());
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return time;
+  return (d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + time;
+}
+
+function addMessage(role, text, time) {
   const div = document.createElement('div');
   div.className = 'message ' + role;
   const avatarEl = document.createElement('div');
@@ -337,6 +351,12 @@ function addMessage(role, text) {
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
   bubble.textContent = text;
+  if (time) {
+    const timeEl = document.createElement('div');
+    timeEl.className = 'msg-time';
+    timeEl.textContent = fmtTime(time);
+    bubble.appendChild(timeEl);
+  }
   div.appendChild(avatarEl);
   div.appendChild(bubble);
   chatEl.appendChild(div);
@@ -351,7 +371,8 @@ async function send() {
   sending = true;
   sendBtn.disabled = true;
   input.value = '';
-  addMessage('user', msg);
+  const now = new Date().toISOString();
+  addMessage('user', msg, now);
 
   const loading = addMessage('puff', '...');
   loading.classList.add('loading');
@@ -378,7 +399,7 @@ async function send() {
         const data = await apiCall('/api/command', {command: msg.slice(1)});
         loading.remove();
         const resp = data.response || '（Puff 收到了，但没能组织出回复。可能是网络波动，再试一次？）';
-        addMessage('puff', resp);
+        addMessage('puff', resp, data.time);
         sending = false;
         sendBtn.disabled = false;
         return;
@@ -387,11 +408,11 @@ async function send() {
 
     const data = await apiCall('/api/chat', {message: msg});
     loading.remove();
-    addMessage('puff', data.response);
+    addMessage('puff', data.response, data.time);
   } catch(e) {
     loading.remove();
     const errMsg = e.message || '连接中断... 服务器在运行吗？';
-    addMessage('puff', '出错了: ' + errMsg);
+    addMessage('puff', '出错了: ' + errMsg, new Date().toISOString());
     showError('请求失败', errMsg);
   } finally {
     sending = false;
@@ -410,9 +431,9 @@ async function resetChat() {
     const resp = await fetch('/api/reset', {method:'POST'});
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     chatEl.innerHTML = '';
-    addMessage('puff', '泡芙，我在。');
+    addMessage('puff', '泡芙，我在。', new Date().toISOString());
   } catch(e) {
-    addMessage('puff', '重置失败，服务器未响应。');
+    addMessage('puff', '重置失败，服务器未响应。', new Date().toISOString());
     showError('重置失败', '无法重置会话，服务器可能未响应。');
   }
 }
@@ -420,7 +441,7 @@ async function resetChat() {
 async function loadHistory() {
   const ok = await checkApiStatus();
   if (!ok) {
-    addMessage('puff', '泡芙，我在。（未连接到服务）');
+    addMessage('puff', '泡芙，我在。（未连接到服务）', new Date().toISOString());
     return;
   }
   try {
@@ -429,15 +450,15 @@ async function loadHistory() {
     const data = await resp.json();
     const history = data.history || [];
     if (history.length === 0) {
-      addMessage('puff', '泡芙，我在。');
+      addMessage('puff', '泡芙，我在。', new Date().toISOString());
       return;
     }
     for (const msg of history) {
       const role = msg.role === 'user' ? 'user' : 'puff';
-      addMessage(role, msg.content);
+      addMessage(role, msg.content, msg.time);
     }
   } catch(e) {
-    addMessage('puff', '泡芙，我在。');
+    addMessage('puff', '泡芙，我在。', new Date().toISOString());
   }
 }
 
