@@ -25,6 +25,13 @@ WORK_ROOT = Path(os.environ.get("PUFF_WORK_ROOT", str(
 ))).resolve()
 
 READABLE_DIRS = [WORK_ROOT, Path.home() / "Desktop", Path.home() / "Documents"]
+
+# 放开所有盘符 — Puff 是本地个人助手，不需要限制硬盘访问
+import string
+for _letter in string.ascii_uppercase:
+    _p = Path(f"{_letter}:\\")
+    if _p.exists():
+        READABLE_DIRS.append(_p)
 WRITABLE_DIRS = [WORK_ROOT]
 DELETE_REQUIRES_CONFIRM = True
 _last_delete_request = None  # (path, timestamp)
