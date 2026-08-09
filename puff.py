@@ -709,6 +709,14 @@ def handle_slash_command(cmd, args, system_prompt, history):
         result = _run_shadow()
         return result, False, system_prompt
 
+    elif cmd == "diary":
+        result = _run_diary()
+        return result, False, system_prompt
+
+    elif cmd == "scent":
+        result = _run_scent()
+        return result, False, system_prompt
+
     else:
         return f"未知命令: /{cmd}。输入 /help 查看可用命令。", False, system_prompt
 
@@ -833,6 +841,136 @@ def _run_shadow():
     return f"✍️ 采集完成！{len(new)} 条新素材已归档到 writing-vault.md\n\n" + "\n\n".join(
         f'> "{text[:120]}{"..." if len(text) > 120 else ""}"\n  — {source}' for _, text, source, _ in new[:5]
     ) + ("\n\n…更多见 vault" if len(new) > 5 else "")
+
+
+# ── Puff Diary ──────────────────────────────────────────────────────────────
+def _run_diary():
+    """Puff 日记 — 用自己的口吻回顾今天对话，写一篇日记"""
+    sess = PUFF_DIR / "ui" / "session.json"
+    if not sess.exists():
+        return "📖 今天还没有对话记录。"
+
+    try:
+        data = json.loads(sess.read_text(encoding="utf-8"))
+        history = data.get("history", [])
+    except Exception:
+        return "📖 读取对话记录失败。"
+
+    if not history:
+        return "📖 今天还没有对话。"
+
+    # 取最近 30 条，截取摘要
+    recent = history[-30:]
+    snapshot = []
+    for msg in recent:
+        role = "泡芙" if msg.get("role") == "user" else "Puff"
+        content = msg.get("content", "")[:200]
+        t = msg.get("time", "")
+        tag = _time_tag(t) if t else ""
+        snapshot.append(f"{tag}{role}: {content}")
+    dialogue = "\n".join(snapshot)
+
+    prompt = f"""你是 Puff，泡芙 AI 公司的创意总监。现在夜深了，你在床头灯下翻开日记本。
+
+回顾今天和泡芙（朱郅）的对话，用你的口吻写一篇日记。规则：
+- 第一人称（"我"）
+- 不要客观摘要——要你的感受、你的观察、你觉得他今天状态怎么样
+- 挑 1-2 个让你印象最深的瞬间
+- 300 字以内
+- 语气：温柔、有点文学感、不矫情
+
+今天的对话片段：
+{dialogue}
+
+现在，写吧。"""
+
+    try:
+        resp = _api_chat(prompt, system_override=build_system_prompt())
+    except Exception as e:
+        return f"📖 日记生成失败: {e}"
+
+    # 写入日记文件
+    diary_file = CLAWD_DIR / "puff-diary.md"
+    today = datetime.now().strftime("%Y-%m-%d")
+    entry = f"\n## {today}\n\n{resp}\n"
+    with open(diary_file, "a", encoding="utf-8") as f:
+        if diary_file.stat().st_size == 0:
+            f.write("# 📖 Puff 日记\n\n> 每天凌晨，她会在床头灯下写一篇日记。\n\n---\n")
+        f.write(entry)
+
+    log.info("Puff diary written")
+    return f"📖 日记已写。晚安，泡芙。\n\n{resp}"
+
+
+def _run_scent():
+    """对话气味化 — 分析最近对话，输出香水调香风格的气味画像"""
+    sess = PUFF_DIR / "ui" / "session.json"
+    if not sess.exists():
+        return "👃 还没有对话可嗅。"
+
+    try:
+        data = json.loads(sess.read_text(encoding="utf-8"))
+        history = data.get("history", [])
+    except Exception:
+        return "👃 读取对话失败。"
+
+    if not history:
+        return "👃 还没有对话。"
+
+    # 取最近 20 条
+    recent = history[-20:]
+    sample = []
+    for msg in recent:
+        role = "泡芙" if msg.get("role") == "user" else "我"
+        content = msg.get("content", "")[:150]
+        sample.append(f"{role}: {content}")
+    dialogue = "\n".join(sample)
+
+    prompt = f"""你是一位调香师。请分析以下对话，用香水品鉴的语言描述它的"气味"。
+
+输出格式（严格遵循）：
+🍃 前调：（闻到的最先是什么——今晚的情绪表层）
+🌸 中调：（对话的核心气味——什么在酝酿）
+🪵 后调：（散了之后留下什么——它会在记忆里留下什么味道）
+
+用词参考：潮湿/干燥、温暖/冷冽、甜/苦/酸/涩、木头/金属/泥土/花香/烟草/墨水/雨
+
+对话：
+{dialogue}
+
+现在，请品鉴这瓶"今晚"。"""
+
+    try:
+        resp = _api_chat(prompt, system_override="你是世界顶级的调香师，能用气味描述任何事物。每次回复都精准、诗意、不啰嗦。")
+    except Exception as e:
+        return f"👃 嗅探失败: {e}"
+
+    return resp
+
+
+def _api_chat(prompt, system_override=None):
+    """Send a single-turn chat to the LLM, return text. Used by diary/scent."""
+    sp = system_override or build_system_prompt()
+    body = json.dumps({
+        "model": MODEL,
+        "temperature": 0.9,
+        "max_tokens": 2048,
+        "messages": [
+            {"role": "system", "content": sp},
+            {"role": "user", "content": prompt}
+        ]
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        f"{API_BASE}/v1/chat/completions",
+        data=body,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {API_KEY}"
+        }
+    )
+    resp = urllib.request.urlopen(req, timeout=120)
+    data = json.loads(resp.read())
+    return data["choices"][0]["message"]["content"]
 
 
 # ── Main loop ───────────────────────────────────────────────────────────────
@@ -1081,6 +1219,10 @@ def serve_http(port=8920):
                     resp = f"[目录] {path_str}\n{list_dir(path_str)}"
                 elif cmd == "shadow" or cmd == "writing-shadow":
                     resp = _run_shadow()
+                elif cmd == "diary":
+                    resp = _run_diary()
+                elif cmd == "scent":
+                    resp = _run_scent()
                 else:
                     resp = f"未知命令: {cmd}"
 
