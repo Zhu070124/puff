@@ -340,13 +340,28 @@ def execute_tool(name, arguments):
 
 
 # ── API ─────────────────────────────────────────────────────────────────────
+def _time_tag(iso):
+    """Format ISO timestamp into a short tag: [HH:MM] or [MM-DD HH:MM]."""
+    try:
+        dt = datetime.fromisoformat(iso)
+        today = datetime.now()
+        if dt.date() == today.date():
+            return dt.strftime("[%H:%M] ")
+        return dt.strftime("[%m-%d %H:%M] ")
+    except (ValueError, TypeError):
+        return ""
+
 def chat(prompt, system_prompt, history=None):
     """Send a message to DeepSeek API with tool calling support. Returns text response."""
     messages = [{"role": "system", "content": system_prompt}]
 
     if history:
         for h in history[-40:]:
-            messages.append(h)
+            hh = dict(h)
+            tag = _time_tag(hh.pop("time", None))
+            if tag:
+                hh["content"] = tag + hh["content"]
+            messages.append(hh)
 
     messages.append({"role": "user", "content": prompt})
 
